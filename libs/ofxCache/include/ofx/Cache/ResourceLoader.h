@@ -197,7 +197,6 @@ public:
 protected:
     void doRequest(const KeyType& key);
 
-
     bool doHas(const KeyType& key) const
     {
         return _memoryCache->has(key);
