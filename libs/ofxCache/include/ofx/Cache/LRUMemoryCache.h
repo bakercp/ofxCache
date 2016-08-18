@@ -62,14 +62,15 @@ public:
 
 protected:
     bool doHas(const KeyType& key) const override;
-    std::shared_ptr<ValueType> doGet(const KeyType& key) const override;
-    void doPut(const KeyType& key, std::shared_ptr<ValueType> entry) override;
+    std::shared_ptr<ValueType> doGet(const KeyType& key) override;
+    void doAdd(const KeyType& key, std::shared_ptr<ValueType> entry) override;
+    void doUpdate(const KeyType& key, std::shared_ptr<ValueType> entry) override;
     void doRemove(const KeyType& key) override;
-    std::size_t doSize() const override;
+    std::size_t doSize() override;
     void doClear() override;
 
     /// \brief The underlying LRU cache implementation.
-    mutable LRUCache<KeyType, ValueType> _LRUCache;
+    LRUCache<KeyType, ValueType> _LRUCache;
 
 };
 
@@ -95,14 +96,21 @@ bool LRUMemoryCache<KeyType, ValueType>::doHas(const KeyType& key) const
 
 
 template<typename KeyType, typename ValueType>
-std::shared_ptr<ValueType> LRUMemoryCache<KeyType, ValueType>::doGet(const KeyType& key) const
+std::shared_ptr<ValueType> LRUMemoryCache<KeyType, ValueType>::doGet(const KeyType& key)
 {
     return _LRUCache.get(key);
 }
 
 
 template<typename KeyType, typename ValueType>
-void LRUMemoryCache<KeyType, ValueType>::doPut(const KeyType& key, std::shared_ptr<ValueType> entry)
+void LRUMemoryCache<KeyType, ValueType>::doAdd(const KeyType& key, std::shared_ptr<ValueType> entry)
+{
+    _LRUCache.add(key, entry);
+}
+
+
+template<typename KeyType, typename ValueType>
+void LRUMemoryCache<KeyType, ValueType>::doUpdate(const KeyType& key, std::shared_ptr<ValueType> entry)
 {
     _LRUCache.update(key, entry);
 }
@@ -116,7 +124,7 @@ void LRUMemoryCache<KeyType, ValueType>::doRemove(const KeyType& key)
 
 
 template<typename KeyType, typename ValueType>
-std::size_t LRUMemoryCache<KeyType, ValueType>::doSize() const
+std::size_t LRUMemoryCache<KeyType, ValueType>::doSize()
 {
     return _LRUCache.size();
 }
