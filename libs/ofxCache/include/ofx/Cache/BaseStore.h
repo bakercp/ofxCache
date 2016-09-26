@@ -98,7 +98,7 @@ std::shared_ptr<ValueType> BaseReadableStore<KeyType, ValueType>::get(const KeyT
 /// \tparam KeyType The key type.
 /// \tparam ValueType The value type (e.g. a std::shared_ptr<ValueType>).
 template<typename KeyType, typename ValueType>
-class BaseWritableStore: public BaseReadableStore<KeyType, ValueType>
+class BaseWritableStore: public virtual BaseReadableStore<KeyType, ValueType>
 {
 public:
     /// \brief Destroy the BaseWritableStore.
@@ -108,25 +108,31 @@ public:
 
     /// \brief Cache a value.
     ///
-    /// Putting a value in the cache will overwrite any existing value for the
+    /// Adding a value in the cache will overwrite any existing value for the
     /// given key.
     ///
-    /// By default the put operation is synchronous.
+    /// By default the add operation is synchronous.
     ///
     /// \param key The key to cache.
     /// \param entry The value to cache.
     void add(const KeyType& key, std::shared_ptr<ValueType> entry);
 
+    /// \copydoc add()
+    void add(const KeyType& key, const ValueType& entry);
+
     /// \brief Cache a value.
     ///
-    /// Putting a value in the cache will overwrite any existing value for the
+    /// Adding a value in the cache will overwrite any existing value for the
     /// given key.
     ///
-    /// By default the put operation is synchronous.
+    /// By default the update operation is synchronous.
     ///
     /// \param key The key to cache.
     /// \param entry The value to cache.
     void update(const KeyType& key, std::shared_ptr<ValueType> entry);
+
+    /// \copydoc update()
+    void update(const KeyType& key, const ValueType& entry);
 
     /// \brief Remove a value from the cache.
     ///
@@ -173,6 +179,14 @@ void BaseWritableStore<KeyType, ValueType>::add(const KeyType& key,
 
 
 template<typename KeyType, typename ValueType>
+void BaseWritableStore<KeyType, ValueType>::add(const KeyType& key,
+                                                const ValueType& entry)
+{
+    add(key, std::make_shared<ValueType>(entry));
+}
+
+
+template<typename KeyType, typename ValueType>
 void BaseWritableStore<KeyType, ValueType>::update(const KeyType& key,
                                                    std::shared_ptr<ValueType> entry)
 {
@@ -188,6 +202,14 @@ void BaseWritableStore<KeyType, ValueType>::update(const KeyType& key,
         onAdd.notify(this, args);
         doAdd(key, entry);
     }
+}
+
+
+template<typename KeyType, typename ValueType>
+void BaseWritableStore<KeyType, ValueType>::update(const KeyType& key,
+                                                   const ValueType& entry)
+{
+    update(key, std::make_shared<ValueType>(entry));
 }
 
 

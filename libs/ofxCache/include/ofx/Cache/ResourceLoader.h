@@ -36,14 +36,14 @@ namespace Cache {
 
 
 template<typename KeyType, typename ValueType>
-class KeyRequestTask;
+class CacheRequestTask;
 
 
 template<typename KeyType, typename ValueType>
-class BaseKeyRequestTaskLoader
+class BaseResourceCacheLoader
 {
 public:
-    virtual ~BaseKeyRequestTaskLoader()
+    virtual ~BaseResourceCacheLoader()
     {
     }
     
@@ -53,7 +53,7 @@ public:
     ///
     /// \param resource A shared pointer to the resource.
     /// \param key key to load.
-    virtual std::shared_ptr<ValueType> load(KeyRequestTask<KeyType, ValueType>& task) = 0;
+    virtual std::shared_ptr<ValueType> load(CacheRequestTask<KeyType, ValueType>& request) = 0;
 
     /// \brief Convert a given Key to a unique task id.
     /// \param key key to convert.
@@ -64,20 +64,19 @@ public:
 
 
 template<typename KeyType, typename ValueType>
-class KeyRequestTask: public Poco::Task
+class CacheRequestTask: public Poco::Task
 {
 public:
     typedef std::pair<KeyType, std::shared_ptr<ValueType>> KeyValuePair;
 
-    KeyRequestTask(const KeyType& key,
-                   BaseKeyRequestTaskLoader<KeyType, ValueType>& loader):
+    CacheRequestTask(const KeyType& key, BaseResourceCacheLoader<KeyType, ValueType>& loader):
         Poco::Task(loader.toTaskId(key)),
         _key(key),
         _loader(loader)
     {
     }
 
-    virtual ~KeyRequestTask()
+    virtual ~CacheRequestTask()
     {
     }
 
@@ -108,9 +107,9 @@ public:
 private:
     /// The key to load.
     KeyType _key;
-    BaseKeyRequestTaskLoader<KeyType, ValueType>& _loader;
+    BaseResourceCacheLoader<KeyType, ValueType>& _loader;
 
-    friend class BaseKeyRequestTaskLoader<KeyType, ValueType>;
+    friend class BaseResourceCacheLoader<KeyType, ValueType>;
 
 };
 
@@ -126,25 +125,12 @@ private:
 /// \tparam ValueType The value type (e.g. a std::shared_ptr<ValueType>).
 template<typename KeyType, typename ValueType>
 class BaseResourceCache:
-    public BaseKeyRequestTaskLoader<KeyType, ValueType>,
-    public BaseAsyncCache<KeyType, ValueType>
+    public BaseAsyncCache<KeyType, ValueType>,
+    public BaseResourceCacheLoader<KeyType, ValueType>
 {
 public:
-    enum class RequestState
-    {
-        /// \brief The request is unknown.
-        UNKNOWN,
-        /// \brief The request is idle.
-        IDLE,
-        /// \brief The request is starting.
-        STARTING,
-        /// \brief The request is starting.
-        RUNNING,
-        /// \brief The request is being cancelled.
-        CANCELLING,
-        /// \brief The request is finished.
-        FINISHED
-    };
+    typedef RequestCompleteArgs<KeyType, ValueType> RequestCompleteArgs;
+    typedef RequestFailedArgs<KeyType> RequestFailedArgs;
 
     /// \brief Create a BaseResourceCache with the given parameters.
     /// \param cacheSize The number of values to cache in memory.
@@ -155,77 +141,46 @@ public:
     /// \brief Destroy the BaseResourceCache.
     virtual ~BaseResourceCache();
 
-    /// \brief Cancel any outstanding request for the given key.
-    ///
-    /// If there is no request for the given key, the request will be ignored.
-    /// This will attempt to cancel both queued and active requests.
-    ///
-    /// \param key The key to cancel.
-    void cancelRequest(const KeyType& key);
-
-    /// \brief Cancel any outstanding queued request for the given key.
-    ///
-    /// If there is no queued request for the given key, the request will be
-    /// ignored.
-    ///
-    /// \param key The key to cancel.
-    void cancelQueuedRequest(const KeyType& key);
-
-    /// \brief Get the progress 0 - 1 for the given key.
-    ///
-    /// For items that are not loaded or have no progress, return 0.  For items
-    /// that are in progress, return a value 0 - 1.  For items already in the
-    /// cache, return 1.
-    ///
-    /// \param key The key to query.
-    /// \returns the progress on a scale of 0 - 1.
-    float requestProgress(const KeyType& key) const;
-
-    /// \brief Get the state of a given request.
-    /// \param key The key to query.
-    /// \returns the state of the request.
-    RequestState requestState(const KeyType& key) const;
-
-    /// \brief This event is called when a resource request is cancelled.
-    ofEvent<const KeyType> onRequestCancelled;
-
-    /// \brief This event is called when a requested resource fails.
-    ///
-    /// The key will be paired with an error.
-    ofEvent<const std::pair<KeyType, std::string>> onRequestFailed;
-
 protected:
-    void doRequest(const KeyType& key);
-
-    bool doHas(const KeyType& key) const
+    bool doHas(const KeyType& key) const override
     {
         return _memoryCache->has(key);
     }
 
-    std::shared_ptr<ValueType> doGet(const KeyType& key) const
+    std::shared_ptr<ValueType> doGet(const KeyType& key) override
     {
         return _memoryCache->get(key);
     }
 
-    void doPut(const KeyType& key, std::shared_ptr<ValueType> entry)
+    void doAdd(const KeyType& key, std::shared_ptr<ValueType> entry) override
     {
-        _memoryCache->put(key, entry);
+        _memoryCache->add(key, entry);
     }
 
-    void doRemove(const KeyType& key)
+    void doUpdate(const KeyType& key, std::shared_ptr<ValueType> entry) override
+    {
+        _memoryCache->update(key, entry);
+    }
+
+    void doRemove(const KeyType& key) override
     {
         _memoryCache->remove(key);
     }
 
-    std::size_t doSize() const
+    std::size_t doSize() override
     {
         return _memoryCache->size();
     }
-    void doClear()
+    void doClear() override
     {
         _memoryCache->clear();
     }
 
+    void doRequest(const KeyType& key) override;
+    void doCancelRequest(const KeyType& key) override;
+    void doCancelQueuedRequest(const KeyType& key) override;
+    float doRequestProgress(const KeyType& key) const override;
+    RequestState doRequestState(const KeyType& key) const override;
 
     bool onTaskCancelled(const TaskQueueEventArgs& args);
     bool onTaskFailed(const TaskFailedEventArgs& args);
@@ -242,9 +197,6 @@ private:
     ofEventListener _onTaskCancelledListener;
     ofEventListener _onTaskFailedListener;
     ofEventListener _onTaskCustomNotificationListener;
-
-//    ofEventListener _onMem
-
 
     std::unique_ptr<BaseCache<KeyType, ValueType>> _memoryCache;
 
@@ -275,7 +227,7 @@ void BaseResourceCache<KeyType, ValueType>::doRequest(const KeyType& key)
     try
     {
         auto taskId = this->toTaskId(key);
-        _taskQueue.start(taskId, new KeyRequestTask<KeyType, ValueType>(key, *this));
+        _taskQueue.start(taskId, new CacheRequestTask<KeyType, ValueType>(key, *this));
         _requests[taskId] = key;;
     }
     catch (const Poco::ExistsException& exc)
@@ -286,7 +238,7 @@ void BaseResourceCache<KeyType, ValueType>::doRequest(const KeyType& key)
 
 
 template<typename KeyType, typename ValueType>
-void BaseResourceCache<KeyType, ValueType>::cancelRequest(const KeyType& key)
+void BaseResourceCache<KeyType, ValueType>::doCancelRequest(const KeyType& key)
 {
     try
     {
@@ -300,7 +252,7 @@ void BaseResourceCache<KeyType, ValueType>::cancelRequest(const KeyType& key)
 
 
 template<typename KeyType, typename ValueType>
-void BaseResourceCache<KeyType, ValueType>::cancelQueuedRequest(const KeyType& key)
+void BaseResourceCache<KeyType, ValueType>::doCancelQueuedRequest(const KeyType& key)
 {
     try
     {
@@ -314,7 +266,7 @@ void BaseResourceCache<KeyType, ValueType>::cancelQueuedRequest(const KeyType& k
 
 
 template<typename KeyType, typename ValueType>
-float BaseResourceCache<KeyType, ValueType>::requestProgress(const KeyType& key) const
+float BaseResourceCache<KeyType, ValueType>::doRequestProgress(const KeyType& key) const
 {
     try
     {
@@ -328,11 +280,11 @@ float BaseResourceCache<KeyType, ValueType>::requestProgress(const KeyType& key)
 
 
 template<typename KeyType, typename ValueType>
-typename BaseResourceCache<KeyType, ValueType>::RequestState BaseResourceCache<KeyType, ValueType>::requestState(const KeyType& key) const
+RequestState BaseResourceCache<KeyType, ValueType>::doRequestState(const KeyType& key) const
 {
     try
     {
-        Poco::Task::TaskState status = _taskQueue.getTaskState(toTaskId(key));
+        Poco::Task::TaskState status = _taskQueue.getTaskState(this->toTaskId(key));
 
         switch (status)
         {
@@ -347,12 +299,12 @@ typename BaseResourceCache<KeyType, ValueType>::RequestState BaseResourceCache<K
             case Poco::Task::TASK_FINISHED:
                 return RequestState::FINISHED;
             default:
-                return RequestState::NONE;
+                return RequestState::UNKNOWN;
         }
     }
     catch (const Poco::ExistsException& exc)
     {
-        return RequestState::NONE;
+        return RequestState::UNKNOWN;
     }
 }
 
@@ -364,7 +316,7 @@ bool BaseResourceCache<KeyType, ValueType>::onTaskCancelled(const TaskQueueEvent
 
     if (iter != _requests.end())
     {
-        ofNotifyEvent(onRequestCancelled, iter->second, this);
+        ofNotifyEvent(this->onRequestCancelled, iter->second, this);
         _requests.erase(iter);
         return true;
     }
@@ -379,11 +331,11 @@ template<typename KeyType, typename ValueType>
 bool BaseResourceCache<KeyType, ValueType>::onTaskFailed(const TaskFailedEventArgs& args)
 {
     auto iter = _requests.find(args.taskId());
-
+    
     if (iter != _requests.end())
     {
-        auto evt = std::make_pair(iter->second, args.getException().displayText());
-        ofNotifyEvent(onRequestFailed, evt, this);
+        RequestFailedArgs evt(iter->second, args.getException().displayText());
+        ofNotifyEvent(this->onRequestFailed, evt, this);
         _requests.erase(iter);
         return true;
     }
@@ -398,21 +350,21 @@ template<typename KeyType, typename ValueType>
 bool BaseResourceCache<KeyType, ValueType>::onTaskCustomNotification(const TaskCustomNotificationEventArgs& args)
 {
     auto iter = _requests.find(args.taskId());
-
+    
     if (iter != _requests.end())
     {
-        typename KeyRequestTask<KeyType, ValueType>::KeyValuePair result;
-
+        typename CacheRequestTask<KeyType, ValueType>::KeyValuePair result;
+        
         if (args.extract(result))
         {
             // Cache it!
-            this->put(result.first, result.second);
+            this->add(result.first, result.second);
         }
         else
         {
             ofLogError("BaseResourceCache<KeyType, ValueType>::onTaskCustomNotification") << "Unable to extract the value.";
         }
-
+        
         return true;
     }
     else
@@ -420,39 +372,6 @@ bool BaseResourceCache<KeyType, ValueType>::onTaskCustomNotification(const TaskC
         return false;
     }
 }
-
-
-//////////////////////
-//
-//class SimpleResourceCache: public BaseResourceCache<std::string, std::string>
-//{
-//public:
-//    using BaseResourceCache<std::string, std::string>::BaseResourceCache;
-//
-//    std::shared_ptr<std::string> load(KeyRequestTask<std::string, std::string>& task) override
-//    {
-//        // task.isCancelled()
-//        task.setProgress(1);
-//
-//        auto result = std::make_shared<std::string>("hello");
-//
-//        if (result != nullptr)
-//        {
-//            return result;
-//        }
-//        else
-//        {
-//            throw Poco::IOException("Unable to load string.");
-//        }
-//    }
-//
-//    std::string toTaskId(const std::string& key) const override {
-//        std::string _key = key;
-//        std::reverse(_key.begin(), _key.end());
-//        return _key;
-//    }
-//
-//};
 
 
 } } // namespace ofx::Cache

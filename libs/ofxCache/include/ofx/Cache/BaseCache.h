@@ -34,6 +34,23 @@ namespace ofx {
 namespace Cache {
 
 
+/// \brief A collection of possible request statuses.
+enum class CacheStatus
+{
+    /// \brief An unknown or undetermined status.
+    NONE,
+    /// \brief A response was generated from the cache with no requests sent upstream.
+    CACHE_HIT,
+    /// \brief The response came from an upstream server.
+    CACHE_MISS,
+    /// \brief The response was generated directly by the caching module.
+    CACHE_MODULE_RESPONSE,
+    /// \brief The response was generated from the cache after validating the entry with the origin server.
+    VALIDATED,
+
+};
+
+
 /// \brief A thread-safe cascading cache node.
 ///
 /// Caches can be chained in order to have several layers of caching, e.g.
@@ -49,33 +66,22 @@ namespace Cache {
 ///
 /// \tparam KeyType The key type.
 /// \tparam ValueType The value type (e.g. a std::shared_ptr<ValueType>).
-template<typename KeyType, typename ValueType>
+template<typename KeyType, typename ValueType, typename ChildKeyType = KeyType, typename ChildValueType = ValueType>
 class BaseCache: public BaseWritableStore<KeyType, ValueType>
 {
 public:
-    typedef BaseReadableStore<KeyType, ValueType> ChildStore;
-
-    /// \brief A collection of possible request statuses.
-    enum class CacheStatus
-    {
-        /// \brief An unknown or undetermined status.
-        NONE,
-        /// \brief A response was generated from the cache with no requests sent upstream.
-        CACHE_HIT,
-        /// \brief The response came from an upstream server.
-        CACHE_MISS,
-        /// \brief The response was generated directly by the caching module.
-        CACHE_MODULE_RESPONSE,
-        /// \brief The response was generated from the cache after validating the entry with the origin server.
-        VALIDATED,
-
-    };
+    typedef BaseCache<ChildKeyType, ChildValueType> ChildStore;
 
     /// \brief Create a default BaseCache.
-    BaseCache(std::unique_ptr<ChildStore> childStore = nullptr);
+    BaseCache(std::unique_ptr<ChildStore> childStore = nullptr)
+    {
+        setChild(std::move(childStore));
+    }
 
     /// \brief Destroy the BaseCache.
-    virtual ~BaseCache();
+    virtual ~BaseCache()
+    {
+    }
 
     /// \brief Recursively get a value by its key.
     ///
@@ -88,13 +94,41 @@ public:
     ///
     /// \param key The key to get.
     /// \returns std::shared_ptr<ValueType> or nullptr if the cache missed.
-    std::shared_ptr<ValueType> get(const KeyType& key) override;
+    std::shared_ptr<ValueType> get(const KeyType& key) override
+    {
+        auto result = this->doGet(key);
+
+        if (result != nullptr)
+        {
+            return result;
+        }
+        else if (_childStore != nullptr)
+        {
+            result = _childStore->get(key);
+
+            if (result != nullptr)
+            {
+                this->onAdd.notify(this, std::make_pair(key, result));
+                this->doAdd(key, result);
+            }
+            
+            return result;
+        }
+        else return nullptr;
+    }
 
     /// \returns the number of elements in this cache node cache.
-    std::size_t size();
+    std::size_t size()
+    {
+        return doSize();
+    }
 
     /// \brief Clear all values in this cache node.
-    void clear();
+    void clear()
+    {
+        onClear.notify(this);
+        doClear();
+    }
 
     /// \brief Take ownership of the passed std::unique_ptr<StoreType>.
     ///
@@ -106,8 +140,29 @@ public:
     /// ownership of the pointer via a std::unique_ptr.
     /// \tparam StoreType The StoreType.
     template<typename StoreType>
-    StoreType* setChild(std::unique_ptr<StoreType> store);
+    StoreType* setChild(std::unique_ptr<StoreType> store)
+    {
+        static_assert(std::is_base_of<ChildStore, StoreType>(), "StoreType must be derived from BaseStore.");
+        // Get a raw pointer to the node for later.
+        StoreType* pNode = store.get();
 
+        // Take ownership of the node.
+        _childStore = std::move(store);
+
+        if (_childStore != nullptr)
+        {
+            ofAddListener(_childStore->onAdd, this, &BaseCache::onChildAdd);
+            ofAddListener(_childStore->onUpdate, this, &BaseCache::onChildUpdate);
+            ofAddListener(_childStore->onRemove, this, &BaseCache::onChildRemove);
+            ofAddListener(_childStore->onHas, this, &BaseCache::onChildHas);
+            ofAddListener(_childStore->onGet, this, &BaseCache::onChildGet);
+            ofAddListener(_childStore->onClear, this, &BaseCache::onChildClear);
+        }
+
+        return pNode;
+    }
+
+    
     /// \brief Create a child using a templated StoreType.
     ///
     /// To create a child StoreType you can use this method like:
@@ -120,19 +175,101 @@ public:
     /// \tparam StoreType The Cache Type.
     /// \tparam Args the StoreType constructor arguments.
     template<typename StoreType, typename... Args>
-    StoreType* setChild(Args&&... args);
+    StoreType* setChild(Args&&... args)
+    {
+        return setChild(std::make_unique<StoreType>(std::forward<Args>(args)...));
+    }
 
     /// \brief Release ownership of a child Cache.
     /// \param element The cache to release.
     /// \returns a std::unique_ptr<BaseCache<KeyType, ValueType>> to the child or nullptr if none.
-    std::unique_ptr<ChildStore> removeChild();
+    std::unique_ptr<ChildStore> removeChild()
+    {
+        if (_childStore != nullptr)
+        {
+            ofRemoveListener(_childStore->onAdd, this, &BaseCache::onChildAdd);
+            ofRemoveListener(_childStore->onUpdate, this, &BaseCache::onChildUpdate);
+            ofRemoveListener(_childStore->onRemove, this, &BaseCache::onChildRemove);
+            ofRemoveListener(_childStore->onHas, this, &BaseCache::onChildHas);
+            ofRemoveListener(_childStore->onGet, this, &BaseCache::onChildGet);
+            ofRemoveListener(_childStore->onClear, this, &BaseCache::onChildClear);
+        }
+
+        return std::move(_childStore);
+    }
 
     /// \brief An event called when the cache is cleared.
     ofEvent<void> onClear;
     
 protected:
+    bool onChildAdd(const std::pair<KeyType, std::shared_ptr<ValueType>>& evt)
+    {
+        return doOnChildAdd(evt);
+    }
+
+    bool onChildUpdate(const std::pair<KeyType, std::shared_ptr<ValueType>>& evt)
+    {
+        return doOnChildUpdate(evt);
+    }
+
+    bool onChildRemove(const KeyType& evt)
+    {
+        return doOnChildRemove(evt);
+    }
+
+    bool onChildHas(const KeyType& evt)
+    {
+        return doOnChildHas(evt);
+    }
+
+    bool onChildGet(const KeyType& evt)
+    {
+        return doOnChildGet(evt);
+    }
+
+    bool onChildClear()
+    {
+        return doOnChildClear();
+    }
+
     virtual std::size_t doSize() = 0;
     virtual void doClear() = 0;
+
+    virtual bool doOnChildAdd(const std::pair<KeyType, std::shared_ptr<ValueType>>& evt)
+    {
+        ofLogVerbose("BaseCache::doOnChildAdd") << "Not implmented.";
+        return false;
+    }
+
+    virtual bool doOnChildUpdate(const std::pair<KeyType, std::shared_ptr<ValueType>>& evt)
+    {
+        ofLogVerbose("BaseCache::doOnChildUpdate") << "Not implmented.";
+        return false;
+    }
+
+    virtual bool doOnChildRemove(const KeyType& evt)
+    {
+        ofLogVerbose("BaseCache::doOnChildRemove") << "Not implmented.";
+        return false;
+    }
+
+    virtual bool doOnChildHas(const KeyType& evt)
+    {
+        ofLogVerbose("BaseCache::doOnChidoOnChildHasldAdd") << "Not implmented.";
+        return false;
+    }
+
+    virtual bool doOnChildGet(const KeyType& evt)
+    {
+        ofLogVerbose("BaseCache::doOnChildGet") << "Not implmented.";
+        return false;
+    }
+
+    virtual bool doOnChildClear()
+    {
+        ofLogVerbose("BaseCache::doOnChildClear") << "Not implmented.";
+        return false;
+    }
 
 private:
     std::unique_ptr<ChildStore> _childStore = nullptr;
@@ -140,234 +277,5 @@ private:
 };
 
 
-template<typename KeyType, typename ValueType>
-BaseCache<KeyType, ValueType>::BaseCache(std::unique_ptr<ChildStore> childStore)
-{
-    setChild(std::move(childStore));
-}
-
-
-template<typename KeyType, typename ValueType>
-BaseCache<KeyType, ValueType>::~BaseCache()
-{
-}
-
-
-template<typename KeyType, typename ValueType>
-std::shared_ptr<ValueType> BaseCache<KeyType, ValueType>::get(const KeyType& key)
-{
-    auto result = this->doGet(key);
-
-    if (result != nullptr)
-    {
-        return result;
-    }
-    else if (_childStore != nullptr)
-    {
-        result = _childStore->get(key);
-
-        if (result != nullptr)
-        {
-            this->onAdd.notify(this, std::make_pair(key, result));
-            this->doAdd(key, result);
-        }
-
-        return result;
-    }
-    else return nullptr;
-}
-
-
-template<typename KeyType, typename ValueType>
-std::size_t BaseCache<KeyType, ValueType>::size()
-{
-    return doSize();
-}
-
-
-template<typename KeyType, typename ValueType>
-void BaseCache<KeyType, ValueType>::clear()
-{
-    onClear.notify(this);
-    doClear();
-}
-
-
-template<typename KeyType, typename ValueType>
-template<typename StoreType, typename... Args>
-StoreType* BaseCache<KeyType, ValueType>::setChild(Args&&... args)
-{
-    return addChild(std::make_unique<StoreType>(std::forward<Args>(args)...));
-}
-
-
-template<typename KeyType, typename ValueType>
-template<typename StoreType>
-StoreType* BaseCache<KeyType, ValueType>::setChild(std::unique_ptr<StoreType> cache)
-{
-
-    static_assert(std::is_base_of<ChildStore, StoreType>(), "StoreType must be derived from BaseStore.");
-    // Get a raw pointer to the node for later.
-    StoreType* pNode = cache.get();
-
-    // Take ownership of the node.
-    _childStore = std::move(cache);
-
-    return pNode;
-}
-
-
-template<typename KeyType, typename ValueType>
-std::unique_ptr<typename BaseCache<KeyType, ValueType>::ChildStore> BaseCache<KeyType, ValueType>::removeChild()
-{
-    return std::move(_childStore);
-}
-
-
-
-///// \brief A simple base cache type.
-/////
-///// Subclasses must implement all of the protected do* methods. The request()
-///// method defaults to the doGet() method.  Event though some cache
-///// implementations may be thread safe on get() or put(), care should be given
-///// to when various events are notified.
-/////
-///// All functions are synchronous and expected to block to complete their tasks.
-///// Thus, for caches that involve disk or network operations, etc (e.g. sqlite,
-///// file system, etc) the user might consider using an asynchronous cache.
-/////
-///// \tparam KeyType The key type.
-///// \tparam ValueType The value type (e.g. a std::shared_ptr<ValueType>).
-//template<typename KeyType, typename ValueType>
-//class BaseCache
-//{
-//public:
-//    /// \brief A collection of possible request statuses.
-//    enum class CacheStatus
-//    {
-//        /// \brief An unknown or undetermined status.
-//        NONE,
-//        /// \brief A response was generated from the cache with no requests sent upstream.
-//        CACHE_HIT,
-//        /// \brief The response came from an upstream server.
-//        CACHE_MISS,
-//        /// \brief The response was generated directly by the caching module.
-//        CACHE_MODULE_RESPONSE,
-//        /// \brief The response was generated from the cache after validating the entry with the origin server.
-//        VALIDATED,
-//
-//    };
-//
-//    /// \brief Destroy the BaseCache.
-//    virtual ~BaseCache()
-//    {
-//    }
-//
-//    /// \brief Determine if the given value is cached.
-//    ///
-//    /// Depending on the cache implementation, it may be more efficient to
-//    /// simply call get() and check for a nullptr.
-//    ///
-//    /// \param key The key to check.
-//    /// \returns true if the requested value is cached.
-//    bool has(const KeyType& key) const
-//    {
-//        return doHas(key);
-//    }
-//
-//    /// \brief Get a value by its key.
-//    /// \param key The key to get.
-//    /// \returns true a shared pointer to the value or nullptr if not cached.
-//    std::shared_ptr<ValueType> get(const KeyType& key) const
-//    {
-//        auto result = doGet(key);
-//
-//        if (result != nullptr)
-//        {
-//            this->onHit.notify(this, key);
-//        }
-//        else
-//        {
-//            this->onMiss.notify(this, key);
-//        }
-//        
-//        return result;
-//    }
-//
-//    /// \brief Cache a value.
-//    ///
-//    /// Putting a value in the cache will overwrite any existing value for the
-//    /// given key.
-//    ///
-//    /// \param key The key to cache.
-//    /// \param entry The value to cache.
-//    void put(const KeyType& key, std::shared_ptr<ValueType> entry)
-//    {
-//        doPut(key, entry);
-//        onPut.notify(this, std::make_pair(key, entry));
-//    }
-//
-//    /// \brief Cache a value.
-//    ///
-//    /// Putting a value in the cache will overwrite any existing value for the
-//    /// given key.
-//    ///
-//    /// The value will be copied to a shared pointer, thus a copy-constructor
-//    /// must be avaialble.
-//    ///
-//    /// \param key The key to cache.
-//    /// \param entry The value to cache.
-//    void put(const KeyType& key, const ValueType& entry)
-//    {
-//        doPut(key, std::make_shared<ValueType>(entry));
-//    }
-//
-//    /// \brief Remove a value from the cache.
-//    /// \param key The key to remove.
-//    /// \returns true if the key was removed.
-//    void remove(const KeyType& key)
-//    {
-//        doRemove(key);
-//        onRemoved.notify(this, key);
-//    }
-//
-//    /// \returns the number of elements in the cache.
-//    std::size_t size() const
-//    {
-//        return doSize();
-//    }
-//
-//    /// \brief Clear the entire cache.
-//    void clear()
-//    {
-//        doClear();
-//        onCleared.notify(this);
-//    }
-//
-//    /// \brief An event called when a value is cached.
-//    mutable ofEvent<const std::pair<KeyType, std::shared_ptr<ValueType>>> onPut;
-//
-//    /// \brief An event called when a value is removed.
-//    mutable ofEvent<const KeyType> onRemoved;
-//
-//    /// \brief An event called when a value is gotten and a cached value is returned.
-//    mutable ofEvent<const KeyType> onHit;
-//
-//    /// \brief An event called when a value is gotten and a cached value is not returned.
-//    mutable ofEvent<const KeyType> onMiss;
-//
-//    /// \brief An event called when the cache is cleared.
-//    mutable ofEvent<void> onCleared;
-//
-//protected:
-//    virtual bool doHas(const KeyType& key) const = 0;
-//    virtual std::shared_ptr<ValueType> doGet(const KeyType& key) const = 0;
-//    virtual void doPut(const KeyType& key, std::shared_ptr<ValueType> entry) = 0;
-//    virtual void doRemove(const KeyType& key) = 0;
-//    virtual std::size_t doSize() const = 0;
-//    virtual void doClear() = 0;
-//
-//};
-//
 
 } } // namespace ofx::Cache
