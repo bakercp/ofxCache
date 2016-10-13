@@ -38,37 +38,57 @@ namespace Cache {
 
 /// \brief A simple File cache.
 template <typename KeyType, typename ValueType>
-class BaseReadableFileStore: public BaseReadableURIStore<KeyType, ValueType, ofFile>
+class BaseReadableFileStore: public virtual BaseReadableURIStore<KeyType, ValueType, ofBuffer>
 {
 public:
     /// \brief Destroy the BaseReadableFileStore.
-    virtual ~BaseReadableFileStore()
+    virtual ~BaseReadableFileStore() { }
 
 protected:
-    virtual bool doHas(const KeyType& key) const override;
-    std::shared_ptr<ValueType> doGet(const KeyType& key) override;
+
+//    virtual bool doHas(const KeyType& key) const = 0;
+//    virtual std::shared_ptr<ValueType> doGet(const KeyType& key) = 0;
+
+    bool doHas(const KeyType& key) const override
+    {
+        return ofFile(this->keyToURI(key)).exists();
+    }
+
+    std::shared_ptr<ValueType> doGet(const KeyType& key) override
+    {
+        return this->rawToValue(ofLoadBufferFromFile(this->keyToURI(key)));
+    }
 
 };
 
 
-template<typename KeyType, typename ValueType>
-BaseReadableFileStore<KeyType, ValueType>::~BaseReadableFileStore()
+/// \brief A simple File cache.
+template <typename KeyType, typename ValueType>
+class BaseWritableFileStore: public virtual BaseWritableURIStore<KeyType, ValueType, ofBuffer>
 {
-}
+public:
+    /// \brief Destroy the BaseReadableFileStore.
+    virtual ~BaseWritableFileStore() { }
 
+protected:
+    void doAdd(const KeyType& key, std::shared_ptr<ValueType> entry) override
+    {
+        std::string uri = this->keyToURI(key);
+        std::shared_ptr<ofBuffer> buffer = this->valueToRaw(*entry.get());
 
-template<typename KeyType, typename ValueType>
-bool BaseReadableFileStore<KeyType, ValueType>::doHas(const KeyType& key) const
-{
-    return ofFile(this->keyToURI(key)).exists();
-}
+        if (!ofBufferToFile(uri, *buffer))
+        {
+            ofLogError("BaseWritableFileStore::doAdd") << "Failed to add " << uri;
+        }
+    }
 
+    void doRemove(const KeyType& key) override
+    {
+        ofFile(this->keyToURI(key)).remove();
+    }
 
-template<typename KeyType, typename ValueType>
-std::shared_ptr<ValueType> BaseReadableFileStore<KeyType, ValueType>::doGet(const KeyType& key)
-{
-    return this->rawToValue(ofFile(this->keyToURI(key)));
-}
+};
+
 
 
 } } // namespace ofx::Cache

@@ -27,6 +27,7 @@
 
 
 #include "ofEvent.h"
+#include "ofLog.h"
 #include "ofx/Cache/BaseStore.h"
 
 

@@ -32,9 +32,9 @@ class ofApp: public ofxUnitTestsApp
         ofxCache::LRUMemoryCache<int, int> aCache(3);
         test_eq(aCache.size(), 0, testName);
 
-        aCache.put(1, 2);
-        aCache.put(3, 4);
-        aCache.put(5, 6);
+        aCache.add(1, 2);
+        aCache.add(3, 4);
+        aCache.add(5, 6);
         test_eq(aCache.size(), 3, testName);
         //test_eq(aCache.getAllKeys().size() == 3);
         test(aCache.has(1), testName);
@@ -68,16 +68,16 @@ class ofApp: public ofxUnitTestsApp
     {
         std::string testName = "testCacheSize1";
         ofxCache::LRUMemoryCache<int, int> aCache(1);
-        aCache.put(1, 2);
+        aCache.add(1, 2);
         test(aCache.has(1), testName);
         test(*aCache.get(1), testName);
 
-        aCache.put(3, 4); // replaces 1
+        aCache.add(3, 4); // replaces 1
         test(!aCache.has(1), testName);
         test(aCache.has(3), testName);
         test_eq(*aCache.get(3), 4, testName);
 
-        aCache.put(5, 6);
+        aCache.add(5, 6);
         test(!aCache.has(1), testName);
         test(!aCache.has(3), testName);
         test(aCache.has(5), testName);
@@ -134,24 +134,24 @@ class ofApp: public ofxUnitTestsApp
         // 3-1 represents the cache sorted by pos, elements get replaced at the end of the list
         // 3-1|5 -> 5 gets removed
         ofxCache::LRUMemoryCache<int, int> aCache(3);
-        aCache.put(1, 2); // 1
+        aCache.add(1, 2); // 1
         test(aCache.has(1),"");
         test_eq(*aCache.get(1), 2, "");
 
-        aCache.put(3, 4); // 3-1
+        aCache.add(3, 4); // 3-1
         test(aCache.has(1), "");
         test(aCache.has(3), "");
         test_eq(*aCache.get(1), 2, ""); // 1-3
         test_eq(*aCache.get(3), 4, ""); // 3-1
 
-        aCache.put(5, 6); // 5-3-1
+        aCache.add(5, 6); // 5-3-1
         test(aCache.has(1), "");
         test(aCache.has(3), "");
         test(aCache.has(5), "");
         test_eq(*aCache.get(5), 6, "");  // 5-3-1
         test_eq(*aCache.get(3), 4, "");  // 3-5-1
 
-        aCache.put(7, 8); // 7-5-3|1
+        aCache.add(7, 8); // 7-5-3|1
         test(!aCache.has(1), "");
         test(aCache.has(7), "");
         test(aCache.has(3), "");
@@ -164,7 +164,7 @@ class ofApp: public ofxUnitTestsApp
         aCache.remove(5); // 7-3
         test(!aCache.has(5), "");
         test_eq(*aCache.get(3), 4, "");  // 3-7
-        aCache.put(5, 6); // 5-3-7
+        aCache.add(5, 6); // 5-3-7
         test_eq(*aCache.get(7), 8, "");  // 7-5-3
         aCache.remove(7); // 5-3
         test(!aCache.has(7), "");
@@ -183,10 +183,10 @@ class ofApp: public ofxUnitTestsApp
     void testDuplicateAdd()
     {
         ofxCache::LRUMemoryCache<int, int> aCache(3);
-        aCache.put(1, 2); // 1
+        aCache.add(1, 2); // 1
         test(aCache.has(1), "");
         test_eq(*aCache.get(1), 2, "");
-        aCache.put(1, 3);
+        aCache.add(1, 3);
         test(aCache.has(1), "");
         test_eq(*aCache.get(1),  3, "");
     }
@@ -195,62 +195,61 @@ class ofApp: public ofxUnitTestsApp
     void testUpdate()
     {
         std::string testName = "testUpdate";
-        putCnt = 0;
+        addCnt = 0;
         removeCnt = 0;
-        hitCnt = 0;
-        missCnt = 0;
         ofxCache::LRUMemoryCache<int, int> aCache(3);
 
-        auto lAdd = aCache.onPut.newListener(this, &ofApp::onPut);
-        auto lRemove = aCache.onRemoved.newListener(this, &ofApp::onRemove);
-        auto lHit = aCache.onHit.newListener(this, &ofApp::onHit);
-        auto lMiss = aCache.onMiss.newListener(this, &ofApp::onMiss);
+        auto lAdd = aCache.onAdd.newListener(this, &ofApp::onAdd);
+        auto lUpdate = aCache.onAdd.newListener(this, &ofApp::onUpdate);
+        auto lRemove = aCache.onRemove.newListener(this, &ofApp::onRemove);
 
-        aCache.put(1, 2); // 1 ,one add event
-        test_eq(putCnt, 1, testName);
+        aCache.add(1, 2); // 1 ,one add event
+        test_eq(addCnt, 1, testName);
+        test_eq(updateCnt, 1, testName);
         test_eq(removeCnt, 0, testName);
-        
+
         test(aCache.has(1), testName);
         test_eq(*aCache.get(1), 2, testName);
 
-        test_eq(aCache.get(1000), std::shared_ptr<int>(), testName);
-        test_eq(missCnt, 1, testName);
-        test_eq(hitCnt, 1, testName);
-        aCache.put(1, 3);
-
-        test_eq(putCnt, 2, testName);
-
+        test_eq(addCnt, 1, testName);
+        test_eq(updateCnt, 1, testName);
         test_eq(removeCnt, 0, testName);
-        test(aCache.has(1), testName);
-        test_eq(*aCache.get(1), 3, testName);
+
+        test_eq(aCache.get(1000), std::shared_ptr<int>(), testName);
+
+        aCache.add(1, 3);
+        test_eq(addCnt, 2, testName);
+        test_eq(updateCnt, 2, testName);
+        test_eq(removeCnt, 1, testName);
+
+        aCache.remove(1);
+        test_eq(addCnt, 2, testName);
+        test_eq(updateCnt, 2, testName);
+        test_eq(removeCnt, 2, testName);
+
+        test_eq(aCache.size(), 0, testName);
+
     }
 
-    void onHit(const int& args)
+    void onAdd(const std::pair<int, std::shared_ptr<int>>& args)
     {
-        ++hitCnt;
+        ++addCnt;
     }
 
-    void onMiss(const int& args)
+    void onUpdate(const std::pair<int, std::shared_ptr<int>>& args)
     {
-        ++missCnt;
+        ++updateCnt;
     }
 
-    void onPut(const std::pair<int, std::shared_ptr<int>>& args)
-    {
-        ++putCnt;
-    }
-    
-    
+
     void onRemove(const int& args)
     {
         ++removeCnt;
     }
 
-    int putCnt = 0;
+    int addCnt = 0;
+    int updateCnt = 0;
     int removeCnt = 0;
-
-    int hitCnt = 0;
-    int missCnt = 0;
 };
 
 

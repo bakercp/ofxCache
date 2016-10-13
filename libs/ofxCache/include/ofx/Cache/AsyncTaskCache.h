@@ -36,14 +36,14 @@ namespace Cache {
 
 
 template<typename KeyType, typename ValueType>
-class CacheRequestTask;
+class AsyncCacheRequestTask;
 
 
 template<typename KeyType, typename ValueType>
-class BaseResourceCacheLoader
+class BaseAsyncCacheLoader
 {
 public:
-    virtual ~BaseResourceCacheLoader()
+    virtual ~BaseAsyncCacheLoader()
     {
     }
     
@@ -53,7 +53,7 @@ public:
     ///
     /// \param resource A shared pointer to the resource.
     /// \param key key to load.
-    virtual std::shared_ptr<ValueType> load(CacheRequestTask<KeyType, ValueType>& request) = 0;
+    virtual std::shared_ptr<ValueType> load(AsyncCacheRequestTask<KeyType, ValueType>& request) = 0;
 
     /// \brief Convert a given Key to a unique task id.
     /// \param key key to convert.
@@ -64,19 +64,19 @@ public:
 
 
 template<typename KeyType, typename ValueType>
-class CacheRequestTask: public Poco::Task
+class AsyncCacheRequestTask: public Poco::Task
 {
 public:
     typedef std::pair<KeyType, std::shared_ptr<ValueType>> KeyValuePair;
 
-    CacheRequestTask(const KeyType& key, BaseResourceCacheLoader<KeyType, ValueType>& loader):
+    AsyncCacheRequestTask(const KeyType& key, BaseAsyncCacheLoader<KeyType, ValueType>& loader):
         Poco::Task(loader.toTaskId(key)),
         _key(key),
         _loader(loader)
     {
     }
 
-    virtual ~CacheRequestTask()
+    virtual ~AsyncCacheRequestTask()
     {
     }
 
@@ -107,24 +107,17 @@ public:
 private:
     /// The key to load.
     KeyType _key;
-    BaseResourceCacheLoader<KeyType, ValueType>& _loader;
+    BaseAsyncCacheLoader<KeyType, ValueType>& _loader;
 
-    friend class BaseResourceCacheLoader<KeyType, ValueType>;
+    friend class BaseAsyncCacheLoader<KeyType, ValueType>;
 
 };
 
 
-/// \brief A resource cache is a composite of a memory cache and a disk cache.
-///
-/// When an value is requested with request() it will first search for the value
-/// in the LRUMemoryCache. If it is not available, a thread will be queued to
-/// attempt to load the resource into the cache. Subclasses must implement the
-/// load() function from the BaseKeyRequestTaskLoader() interface.
-///
 /// \tparam KeyType The key type.
 /// \tparam ValueType The value type (e.g. a std::shared_ptr<ValueType>).
 template<typename KeyType, typename ValueType>
-class BaseResourceCache:
+class AsyncTaskCache:
     public BaseAsyncCache<KeyType, ValueType>,
     public BaseResourceCacheLoader<KeyType, ValueType>
 {
@@ -132,48 +125,47 @@ public:
     typedef RequestCompleteArgs<KeyType, ValueType> RequestCompleteArgs;
     typedef RequestFailedArgs<KeyType> RequestFailedArgs;
 
-    /// \brief Create a BaseResourceCache with the given parameters.
-    /// \param cacheSize The number of values to cache in memory.
+    /// \brief Create a AsyncTaskCache with the given parameters.
     /// \param taskQueue The task queue used to make carry out KeyRequestTasks.
-    BaseResourceCache(std::unique_ptr<BaseCache<KeyType, ValueType>> memoryCache = std::make_unique<LRUMemoryCache<KeyType, ValueType>>(),
-                      TaskQueue& taskQueue = TaskQueue::instance());
+    AsyncTaskCache(TaskQueue& taskQueue = TaskQueue::instance());
 
-    /// \brief Destroy the BaseResourceCache.
-    virtual ~BaseResourceCache();
+    /// \brief Destroy the AsyncTaskCache.
+    virtual ~AsyncTaskCache();
 
 protected:
-    bool doHas(const KeyType& key) const override
+    virtual bool doHas(const KeyType& key) const override
     {
-        return _memoryCache->has(key);
+        ofLogError("AsyncTaskCache::doHas()") << "Not implemented.";
     }
 
-    std::shared_ptr<ValueType> doGet(const KeyType& key) override
+    virtual std::shared_ptr<ValueType> doGet(const KeyType& key) override
     {
-        return _memoryCache->get(key);
+        ofLogError("AsyncTaskCache::doGet()") << "Not implemented.";
     }
 
-    void doAdd(const KeyType& key, std::shared_ptr<ValueType> entry) override
+    virtual void doAdd(const KeyType& key, std::shared_ptr<ValueType> entry) override
     {
-        _memoryCache->add(key, entry);
+        ofLogError("AsyncTaskCache::doAdd()") << "Not implemented.";
     }
 
-    void doUpdate(const KeyType& key, std::shared_ptr<ValueType> entry) override
+    virtual void doUpdate(const KeyType& key, std::shared_ptr<ValueType> entry) override
     {
-        _memoryCache->update(key, entry);
+        ofLogError("AsyncTaskCache::doUpdate()") << "Not implemented.";
     }
 
-    void doRemove(const KeyType& key) override
+    virtual void doRemove(const KeyType& key) override
     {
-        _memoryCache->remove(key);
+        ofLogError("AsyncTaskCache::doRemove()") << "Not implemented.";
     }
 
-    std::size_t doSize() override
+    virtual std::size_t doSize() override
     {
-        return _memoryCache->size();
+        ofLogError("AsyncTaskCache::doSize()") << "Not implemented.";
+        return 0;
     }
-    void doClear() override
+    virtual void doClear() override
     {
-        _memoryCache->clear();
+        ofLogError("AsyncTaskCache::doClear()") << "Not implemented.";
     }
 
     void doRequest(const KeyType& key) override;
@@ -198,31 +190,27 @@ private:
     ofEventListener _onTaskFailedListener;
     ofEventListener _onTaskCustomNotificationListener;
 
-    std::unique_ptr<BaseCache<KeyType, ValueType>> _memoryCache;
-
 };
 
 
 template<typename KeyType, typename ValueType>
-BaseResourceCache<KeyType, ValueType>::BaseResourceCache(std::unique_ptr<BaseCache<KeyType, ValueType>> memoryCache,
-                                                         TaskQueue& taskQueue):
-    _memoryCache(std::move(memoryCache)),
+AsyncTaskCache<KeyType, ValueType>::AsyncTaskCache(TaskQueue& taskQueue):
     _taskQueue(taskQueue),
-    _onTaskCancelledListener(_taskQueue.onTaskCancelled.newListener(this, &BaseResourceCache::onTaskCancelled)),
-    _onTaskFailedListener(_taskQueue.onTaskFailed.newListener(this, &BaseResourceCache::onTaskFailed)),
-    _onTaskCustomNotificationListener(_taskQueue.onTaskCustomNotification.newListener(this, &BaseResourceCache::onTaskCustomNotification))
+    _onTaskCancelledListener(_taskQueue.onTaskCancelled.newListener(this, &AsyncTaskCache::onTaskCancelled)),
+    _onTaskFailedListener(_taskQueue.onTaskFailed.newListener(this, &AsyncTaskCache::onTaskFailed)),
+    _onTaskCustomNotificationListener(_taskQueue.onTaskCustomNotification.newListener(this, &AsyncTaskCache::onTaskCustomNotification))
 {
 }
 
 
 template<typename KeyType, typename ValueType>
-BaseResourceCache<KeyType, ValueType>::~BaseResourceCache()
+AsyncTaskCache<KeyType, ValueType>::~AsyncTaskCache()
 {
 }
 
 
 template<typename KeyType, typename ValueType>
-void BaseResourceCache<KeyType, ValueType>::doRequest(const KeyType& key)
+void AsyncTaskCache<KeyType, ValueType>::doRequest(const KeyType& key)
 {
     try
     {
@@ -238,7 +226,7 @@ void BaseResourceCache<KeyType, ValueType>::doRequest(const KeyType& key)
 
 
 template<typename KeyType, typename ValueType>
-void BaseResourceCache<KeyType, ValueType>::doCancelRequest(const KeyType& key)
+void AsyncTaskCache<KeyType, ValueType>::doCancelRequest(const KeyType& key)
 {
     try
     {
@@ -252,7 +240,7 @@ void BaseResourceCache<KeyType, ValueType>::doCancelRequest(const KeyType& key)
 
 
 template<typename KeyType, typename ValueType>
-void BaseResourceCache<KeyType, ValueType>::doCancelQueuedRequest(const KeyType& key)
+void AsyncTaskCache<KeyType, ValueType>::doCancelQueuedRequest(const KeyType& key)
 {
     try
     {
@@ -266,7 +254,7 @@ void BaseResourceCache<KeyType, ValueType>::doCancelQueuedRequest(const KeyType&
 
 
 template<typename KeyType, typename ValueType>
-float BaseResourceCache<KeyType, ValueType>::doRequestProgress(const KeyType& key) const
+float AsyncTaskCache<KeyType, ValueType>::doRequestProgress(const KeyType& key) const
 {
     try
     {
@@ -280,7 +268,7 @@ float BaseResourceCache<KeyType, ValueType>::doRequestProgress(const KeyType& ke
 
 
 template<typename KeyType, typename ValueType>
-RequestState BaseResourceCache<KeyType, ValueType>::doRequestState(const KeyType& key) const
+RequestState AsyncTaskCache<KeyType, ValueType>::doRequestState(const KeyType& key) const
 {
     try
     {
@@ -310,7 +298,7 @@ RequestState BaseResourceCache<KeyType, ValueType>::doRequestState(const KeyType
 
 
 template<typename KeyType, typename ValueType>
-bool BaseResourceCache<KeyType, ValueType>::onTaskCancelled(const TaskQueueEventArgs& args)
+bool AsyncTaskCache<KeyType, ValueType>::onTaskCancelled(const TaskQueueEventArgs& args)
 {
     auto iter = _requests.find(args.taskId());
 
@@ -328,7 +316,7 @@ bool BaseResourceCache<KeyType, ValueType>::onTaskCancelled(const TaskQueueEvent
 
 
 template<typename KeyType, typename ValueType>
-bool BaseResourceCache<KeyType, ValueType>::onTaskFailed(const TaskFailedEventArgs& args)
+bool AsyncTaskCache<KeyType, ValueType>::onTaskFailed(const TaskFailedEventArgs& args)
 {
     auto iter = _requests.find(args.taskId());
     
@@ -347,7 +335,7 @@ bool BaseResourceCache<KeyType, ValueType>::onTaskFailed(const TaskFailedEventAr
 
 
 template<typename KeyType, typename ValueType>
-bool BaseResourceCache<KeyType, ValueType>::onTaskCustomNotification(const TaskCustomNotificationEventArgs& args)
+bool AsyncTaskCache<KeyType, ValueType>::onTaskCustomNotification(const TaskCustomNotificationEventArgs& args)
 {
     auto iter = _requests.find(args.taskId());
     

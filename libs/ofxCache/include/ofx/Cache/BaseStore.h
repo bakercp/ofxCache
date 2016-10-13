@@ -26,6 +26,9 @@
 #pragma once
 
 
+#include "ofEvents.h"
+
+
 namespace ofx {
 namespace Cache {
 
