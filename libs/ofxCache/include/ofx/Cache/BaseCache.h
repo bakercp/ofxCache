@@ -45,7 +45,7 @@ enum class CacheStatus
 /// ofPixels object cached in memory), adapter caches are available translate
 /// between cache layers that differ in KeyType or ValueType.
 ///
-/// Subclasses _must_ protected their own data to allow multi-threaded access.
+/// Subclasses _must_ protect their own data to allow multi-threaded access.
 ///
 /// \tparam KeyType The key type.
 /// \tparam ValueType The value type (e.g. a std::shared_ptr<ValueType>).

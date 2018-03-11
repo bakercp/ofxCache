@@ -21,7 +21,7 @@ namespace Cache {
 
 /// \brief A simple HTTP cache.
 template <typename KeyType, typename ValueType>
-class BaseReadableHTTPStore: public BaseReadableURIStore<KeyType, ValueType, HTTP::ClientTransaction>
+class BaseReadableHTTPStore: public BaseReadableURIStore<KeyType, ValueType, HTTP::ClientExchange>
 {
 public:
     BaseReadableHTTPStore(const HTTP::ClientSessionSettings& settings = HTTP::ClientSessionSettings());
@@ -60,7 +60,7 @@ bool BaseReadableHTTPStore<KeyType, ValueType>::doHas(const KeyType& key) const
     HTTP::HeadRequest request(this->keyToURI(key));
     auto response = client.execute(context, request);
     HTTP::HTTPUtils::consume(response->stream());
-    return response->getStatus() == HTTP::BaseResponse::HTTP_OK;
+    return response->getStatus() == HTTP::Response::HTTP_OK;
 }
 
 
@@ -71,7 +71,7 @@ std::shared_ptr<ValueType> BaseReadableHTTPStore<KeyType, ValueType>::doGet(cons
     HTTP::Context context(_settings);
     HTTP::GetRequest request(this->keyToURI(key));
     auto response = client.execute(context, request);
-    HTTP::ClientTransaction transaction(request, *response.get(), context);
+    HTTP::ClientExchange transaction(context, request, *response.get());
     return this->rawToValue(transaction);
 }
 
