@@ -94,10 +94,13 @@ public:
                 this->onAdd.notify(this, std::make_pair(key, result));
                 this->doAdd(key, result);
             }
-            
+
+            // This result might be nullptr if the _childStore doesn't have it.
             return result;
         }
-        else return nullptr;
+
+        // No entry available and no _childStore to check.
+        return nullptr;
     }
 
     /// \returns the number of elements in this cache node cache.
