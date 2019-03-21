@@ -8,8 +8,6 @@
 #pragma once
 
 
-#include "ofxIO.h"
-//#include "ofxTaskQueue.h"
 #include "ofx/Cache/LRUMemoryCache.h"
 #include "ofx/Cache/ResourceLoader.h"
 
