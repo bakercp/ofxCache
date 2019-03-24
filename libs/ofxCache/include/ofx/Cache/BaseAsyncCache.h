@@ -58,7 +58,7 @@ public:
 private:
     KeyType _key;
     std::string _error;
-    
+
 };
 
 
@@ -83,17 +83,17 @@ public:
     {
         return _key;
     }
-    
+
     std::shared_ptr<ValueType> value() const
     {
         return _value;
     }
-    
+
     CacheStatus status() const
     {
         return _status;
     }
-    
+
 private:
     KeyType _key;
     std::shared_ptr<ValueType> _value;
@@ -110,8 +110,8 @@ template<typename KeyType, typename ValueType>
 class BaseAsyncCache: public BaseCache<KeyType, ValueType>
 {
 public:
-    typedef RequestCompleteArgs<KeyType, ValueType> RequestCompleteArgs;
-    typedef RequestFailedArgs<KeyType> RequestFailedArgs;
+    typedef RequestCompleteArgs<KeyType, ValueType> _RequestCompleteArgs;
+    typedef RequestFailedArgs<KeyType> _RequestFailedArgs;
 
     /// \brief Destroy the BaseCache.
     virtual ~BaseAsyncCache()
@@ -129,7 +129,7 @@ public:
 
         if (result != nullptr)
         {
-            RequestCompleteArgs args(key, result, CacheStatus::CACHE_HIT);
+            RequestCompleteArgs<KeyType, ValueType> args(key, result, CacheStatus::CACHE_HIT);
             onRequestComplete.notify(this, args);
         }
         else
@@ -170,7 +170,7 @@ public:
     /// \returns the progress on a scale of 0 - 1.
     float requestProgress(const KeyType& key) const
     {
-        doRequestProgress(key);
+        return doRequestProgress(key);
     }
 
     /// \brief Get the state of a given request.
@@ -182,7 +182,7 @@ public:
     }
 
     /// \brief An event that is called when the a value is requested.
-    mutable ofEvent<const RequestCompleteArgs> onRequestComplete;
+    mutable ofEvent<const RequestCompleteArgs<KeyType, ValueType>> onRequestComplete;
 
     /// \brief This event is called when a resource request is cancelled.
     mutable ofEvent<const KeyType> onRequestCancelled;
@@ -190,7 +190,7 @@ public:
     /// \brief This event is called when a requested resource fails.
     ///
     /// The key will be paired with an error.
-    mutable ofEvent<const RequestFailedArgs> onRequestFailed;
+    mutable ofEvent<const RequestFailedArgs<KeyType>> onRequestFailed;
 
 protected:
     virtual void doRequest(const KeyType& key) = 0;

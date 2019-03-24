@@ -28,7 +28,7 @@ public:
     virtual ~BaseResourceCacheLoader()
     {
     }
-    
+
     /// \brief Load do a key request.
     ///
     /// This method is called from within tasks to load
@@ -111,8 +111,8 @@ class BaseResourceCache:
     public BaseResourceCacheLoader<KeyType, ValueType>
 {
 public:
-    typedef RequestCompleteArgs<KeyType, ValueType> RequestCompleteArgs;
-    typedef RequestFailedArgs<KeyType> RequestFailedArgs;
+    typedef RequestCompleteArgs<KeyType, ValueType> RequestCompleteArgs_;
+    typedef RequestFailedArgs<KeyType> RequestFailedArgs_;
 
     /// \brief Create a BaseResourceCache with the given parameters.
     /// \param cacheSize The number of values to cache in memory.
@@ -313,10 +313,10 @@ template<typename KeyType, typename ValueType>
 bool BaseResourceCache<KeyType, ValueType>::onTaskFailed(const TaskFailedEventArgs& args)
 {
     auto iter = _requests.find(args.taskId());
-    
+
     if (iter != _requests.end())
     {
-        RequestFailedArgs evt(iter->second, args.getException().displayText());
+        RequestFailedArgs<KeyType> evt(iter->second, args.getException().displayText());
         ofNotifyEvent(this->onRequestFailed, evt, this);
         _requests.erase(iter);
         return true;
@@ -332,11 +332,11 @@ template<typename KeyType, typename ValueType>
 bool BaseResourceCache<KeyType, ValueType>::onTaskCustomNotification(const TaskCustomNotificationEventArgs& args)
 {
     auto iter = _requests.find(args.taskId());
-    
+
     if (iter != _requests.end())
     {
         typename CacheRequestTask<KeyType, ValueType>::KeyValuePair result;
-        
+
         if (args.extract(result))
         {
             // Cache it!
@@ -346,7 +346,7 @@ bool BaseResourceCache<KeyType, ValueType>::onTaskCustomNotification(const TaskC
         {
             ofLogError("BaseResourceCache<KeyType, ValueType>::onTaskCustomNotification") << "Unable to extract the value.";
         }
-        
+
         return true;
     }
     else
