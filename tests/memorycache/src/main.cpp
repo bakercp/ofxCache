@@ -30,23 +30,23 @@ class ofApp: public ofxUnitTestsApp
     {
         std::string testName = "testClear";
         ofxCache::LRUMemoryCache<int, int> aCache(3);
-        test_eq(aCache.size(), 0, testName);
+        ofxTestEq(aCache.size(), 0, testName);
 
         aCache.add(1, 2);
         aCache.add(3, 4);
         aCache.add(5, 6);
-        test_eq(aCache.size(), 3, testName);
-        //test_eq(aCache.getAllKeys().size() == 3);
-        test(aCache.has(1), testName);
-        test(aCache.has(3), testName);
-        test(aCache.has(5), testName);
-        test_eq(*aCache.get(1), 2, testName);
-        test_eq(*aCache.get(3), 4, testName);
-        test_eq(*aCache.get(5), 6, testName);
+        ofxTestEq(aCache.size(), 3, testName);
+        //ofxTestEq(aCache.getAllKeys().size() == 3);
+        ofxTest(aCache.has(1), testName);
+        ofxTest(aCache.has(3), testName);
+        ofxTest(aCache.has(5), testName);
+        ofxTestEq(*aCache.get(1), 2, testName);
+        ofxTestEq(*aCache.get(3), 4, testName);
+        ofxTestEq(*aCache.get(5), 6, testName);
         aCache.clear();
-        test(!aCache.has(1), testName);
-        test(!aCache.has(3), testName);
-        test(!aCache.has(5), testName);
+        ofxTest(!aCache.has(1), testName);
+        ofxTest(!aCache.has(3), testName);
+        ofxTest(!aCache.has(5), testName);
     }
 
 
@@ -56,7 +56,7 @@ class ofApp: public ofxUnitTestsApp
         try
         {
             ofxCache::LRUMemoryCache<int, int> aCache(0);
-            test_eq(0, 1, "Testing init (this will be a failure).");
+            ofxTestEq(0, 1, "Testing init (this will be a failure).");
         }
         catch (Poco::InvalidArgumentException&)
         {
@@ -69,22 +69,22 @@ class ofApp: public ofxUnitTestsApp
         std::string testName = "testCacheSize1";
         ofxCache::LRUMemoryCache<int, int> aCache(1);
         aCache.add(1, 2);
-        test(aCache.has(1), testName);
-        test(*aCache.get(1), testName);
+        ofxTest(aCache.has(1), testName);
+        ofxTest(*aCache.get(1), testName);
 
         aCache.add(3, 4); // replaces 1
-        test(!aCache.has(1), testName);
-        test(aCache.has(3), testName);
-        test_eq(*aCache.get(3), 4, testName);
+        ofxTest(!aCache.has(1), testName);
+        ofxTest(aCache.has(3), testName);
+        ofxTestEq(*aCache.get(3), 4, testName);
 
         aCache.add(5, 6);
-        test(!aCache.has(1), testName);
-        test(!aCache.has(3), testName);
-        test(aCache.has(5), testName);
-        test_eq(*aCache.get(5), 6, testName);
+        ofxTest(!aCache.has(1), testName);
+        ofxTest(!aCache.has(3), testName);
+        ofxTest(aCache.has(5), testName);
+        ofxTestEq(*aCache.get(5), 6, testName);
 
         aCache.remove(5);
-        test(!aCache.has(5), testName);
+        ofxTest(!aCache.has(5), testName);
 
         // removing illegal entries should work too
         aCache.remove(666);
@@ -96,37 +96,37 @@ class ofApp: public ofxUnitTestsApp
         // 3-1|5 -> 5 gets removed
         ofx::LRUCache<int, int> aCache(2);
         aCache.add(1, 2); // 1
-        test(aCache.has(1), "");
-        test_eq(*aCache.get(1), 2, "");
+        ofxTest(aCache.has(1), "");
+        ofxTestEq(*aCache.get(1), 2, "");
 
         aCache.add(3, 4); // 3-1
-        test(aCache.has(1), "");
-        test(aCache.has(3), "");
-        test_eq(*aCache.get(1), 2, ""); // 1-3
-        test_eq(*aCache.get(3), 4, ""); // 3-1
+        ofxTest(aCache.has(1), "");
+        ofxTest(aCache.has(3), "");
+        ofxTestEq(*aCache.get(1), 2, ""); // 1-3
+        ofxTestEq(*aCache.get(3), 4, ""); // 3-1
 
         aCache.add(5, 6); // 5-3|1
-        test(!aCache.has(1), "");
-        test(aCache.has(3), "");
-        test(aCache.has(5), "");
-        test_eq(*aCache.get(5), 6, "");  // 5-3
-        test_eq(*aCache.get(3), 4, "");  // 3-5
+        ofxTest(!aCache.has(1), "");
+        ofxTest(aCache.has(3), "");
+        ofxTest(aCache.has(5), "");
+        ofxTestEq(*aCache.get(5), 6, "");  // 5-3
+        ofxTestEq(*aCache.get(3), 4, "");  // 3-5
 
         // test remove from the end and the beginning of the list
         aCache.remove(5); // 3
-        test(!aCache.has(5), "");
-        test_eq(*aCache.get(3), 4, "");  // 3
+        ofxTest(!aCache.has(5), "");
+        ofxTestEq(*aCache.get(3), 4, "");  // 3
         aCache.add(5, 6); // 5-3
-        test_eq(*aCache.get(3), 4, "");  // 3-5
+        ofxTestEq(*aCache.get(3), 4, "");  // 3-5
         aCache.remove(3); // 5
-        test(!aCache.has(3), "");
-        test_eq(*aCache.get(5), 6, "");  // 5
+        ofxTest(!aCache.has(3), "");
+        ofxTestEq(*aCache.get(5), 6, "");  // 5
 
         // removing illegal entries should work too
         aCache.remove(666);
 
         aCache.clear();
-        test(!aCache.has(5), "");
+        ofxTest(!aCache.has(5), "");
     }
 
     void testCacheSizeN()
@@ -135,48 +135,48 @@ class ofApp: public ofxUnitTestsApp
         // 3-1|5 -> 5 gets removed
         ofxCache::LRUMemoryCache<int, int> aCache(3);
         aCache.add(1, 2); // 1
-        test(aCache.has(1),"");
-        test_eq(*aCache.get(1), 2, "");
+        ofxTest(aCache.has(1),"");
+        ofxTestEq(*aCache.get(1), 2, "");
 
         aCache.add(3, 4); // 3-1
-        test(aCache.has(1), "");
-        test(aCache.has(3), "");
-        test_eq(*aCache.get(1), 2, ""); // 1-3
-        test_eq(*aCache.get(3), 4, ""); // 3-1
+        ofxTest(aCache.has(1), "");
+        ofxTest(aCache.has(3), "");
+        ofxTestEq(*aCache.get(1), 2, ""); // 1-3
+        ofxTestEq(*aCache.get(3), 4, ""); // 3-1
 
         aCache.add(5, 6); // 5-3-1
-        test(aCache.has(1), "");
-        test(aCache.has(3), "");
-        test(aCache.has(5), "");
-        test_eq(*aCache.get(5), 6, "");  // 5-3-1
-        test_eq(*aCache.get(3), 4, "");  // 3-5-1
+        ofxTest(aCache.has(1), "");
+        ofxTest(aCache.has(3), "");
+        ofxTest(aCache.has(5), "");
+        ofxTestEq(*aCache.get(5), 6, "");  // 5-3-1
+        ofxTestEq(*aCache.get(3), 4, "");  // 3-5-1
 
         aCache.add(7, 8); // 7-5-3|1
-        test(!aCache.has(1), "");
-        test(aCache.has(7), "");
-        test(aCache.has(3), "");
-        test(aCache.has(5), "");
-        test_eq(*aCache.get(5), 6, "");  // 5-7-3
-        test_eq(*aCache.get(3), 4, "");  // 3-5-7
-        test_eq(*aCache.get(7), 8, "");  // 7-3-5
+        ofxTest(!aCache.has(1), "");
+        ofxTest(aCache.has(7), "");
+        ofxTest(aCache.has(3), "");
+        ofxTest(aCache.has(5), "");
+        ofxTestEq(*aCache.get(5), 6, "");  // 5-7-3
+        ofxTestEq(*aCache.get(3), 4, "");  // 3-5-7
+        ofxTestEq(*aCache.get(7), 8, "");  // 7-3-5
 
         // test remove from the end and the beginning of the list
         aCache.remove(5); // 7-3
-        test(!aCache.has(5), "");
-        test_eq(*aCache.get(3), 4, "");  // 3-7
+        ofxTest(!aCache.has(5), "");
+        ofxTestEq(*aCache.get(3), 4, "");  // 3-7
         aCache.add(5, 6); // 5-3-7
-        test_eq(*aCache.get(7), 8, "");  // 7-5-3
+        ofxTestEq(*aCache.get(7), 8, "");  // 7-5-3
         aCache.remove(7); // 5-3
-        test(!aCache.has(7), "");
-        test(aCache.has(3), "");
-        test_eq(*aCache.get(5), 6, "");  // 5-3
+        ofxTest(!aCache.has(7), "");
+        ofxTest(aCache.has(3), "");
+        ofxTestEq(*aCache.get(5), 6, "");  // 5-3
 
         // removing illegal entries should work too
         aCache.remove(666);
 
         aCache.clear();
-        test(!aCache.has(5), "");
-        test(!aCache.has(3), "");
+        ofxTest(!aCache.has(5), "");
+        ofxTest(!aCache.has(3), "");
     }
 
 
@@ -184,11 +184,11 @@ class ofApp: public ofxUnitTestsApp
     {
         ofxCache::LRUMemoryCache<int, int> aCache(3);
         aCache.add(1, 2); // 1
-        test(aCache.has(1), "");
-        test_eq(*aCache.get(1), 2, "");
+        ofxTest(aCache.has(1), "");
+        ofxTestEq(*aCache.get(1), 2, "");
         aCache.add(1, 3);
-        test(aCache.has(1), "");
-        test_eq(*aCache.get(1),  3, "");
+        ofxTest(aCache.has(1), "");
+        ofxTestEq(*aCache.get(1),  3, "");
     }
     
     
@@ -204,30 +204,30 @@ class ofApp: public ofxUnitTestsApp
         auto lRemove = aCache.onRemove.newListener(this, &ofApp::onRemove);
 
         aCache.add(1, 2); // 1 ,one add event
-        test_eq(addCnt, 1, testName);
-        test_eq(updateCnt, 1, testName);
-        test_eq(removeCnt, 0, testName);
+        ofxTestEq(addCnt, 1, testName);
+        ofxTestEq(updateCnt, 1, testName);
+        ofxTestEq(removeCnt, 0, testName);
 
-        test(aCache.has(1), testName);
-        test_eq(*aCache.get(1), 2, testName);
+        ofxTest(aCache.has(1), testName);
+        ofxTestEq(*aCache.get(1), 2, testName);
 
-        test_eq(addCnt, 1, testName);
-        test_eq(updateCnt, 1, testName);
-        test_eq(removeCnt, 0, testName);
+        ofxTestEq(addCnt, 1, testName);
+        ofxTestEq(updateCnt, 1, testName);
+        ofxTestEq(removeCnt, 0, testName);
 
-        test_eq(aCache.get(1000), std::shared_ptr<int>(), testName);
+        ofxTestEq(aCache.get(1000), std::shared_ptr<int>(), testName);
 
         aCache.add(1, 3);
-        test_eq(addCnt, 2, testName);
-        test_eq(updateCnt, 2, testName);
-        test_eq(removeCnt, 1, testName);
+        ofxTestEq(addCnt, 2, testName);
+        ofxTestEq(updateCnt, 2, testName);
+        ofxTestEq(removeCnt, 1, testName);
 
         aCache.remove(1);
-        test_eq(addCnt, 2, testName);
-        test_eq(updateCnt, 2, testName);
-        test_eq(removeCnt, 2, testName);
+        ofxTestEq(addCnt, 2, testName);
+        ofxTestEq(updateCnt, 2, testName);
+        ofxTestEq(removeCnt, 2, testName);
 
-        test_eq(aCache.size(), 0, testName);
+        ofxTestEq(aCache.size(), 0, testName);
 
     }
 
