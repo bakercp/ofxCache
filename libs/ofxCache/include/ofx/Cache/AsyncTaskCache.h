@@ -1,7 +1,7 @@
 //
 // Copyright (c) 2014 Christopher Baker <https://christopherbaker.net>
 //
-// SPDX-License-Identifier:	MIT
+// SPDX-License-Identifier: MIT
 //
 
 
@@ -28,7 +28,7 @@ public:
     virtual ~BaseAsyncCacheLoader()
     {
     }
-    
+
     /// \brief Load do a key request.
     ///
     /// This method is called from within tasks to load
@@ -301,7 +301,7 @@ template<typename KeyType, typename ValueType>
 bool AsyncTaskCache<KeyType, ValueType>::onTaskFailed(const TaskFailedEventArgs& args)
 {
     auto iter = _requests.find(args.taskId());
-    
+
     if (iter != _requests.end())
     {
         RequestFailedArgs evt(iter->second, args.getException().displayText());
@@ -320,11 +320,11 @@ template<typename KeyType, typename ValueType>
 bool AsyncTaskCache<KeyType, ValueType>::onTaskCustomNotification(const TaskCustomNotificationEventArgs& args)
 {
     auto iter = _requests.find(args.taskId());
-    
+
     if (iter != _requests.end())
     {
         typename CacheRequestTask<KeyType, ValueType>::KeyValuePair result;
-        
+
         if (args.extract(result))
         {
             // Cache it!
@@ -334,7 +334,7 @@ bool AsyncTaskCache<KeyType, ValueType>::onTaskCustomNotification(const TaskCust
         {
             ofLogError("BaseResourceCache<KeyType, ValueType>::onTaskCustomNotification") << "Unable to extract the value.";
         }
-        
+
         return true;
     }
     else

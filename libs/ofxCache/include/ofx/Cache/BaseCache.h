@@ -1,7 +1,7 @@
 //
 // Copyright (c) 2010 Christopher Baker <https://christopherbaker.net>
 //
-// SPDX-License-Identifier:	MIT
+// SPDX-License-Identifier: MIT
 //
 
 
@@ -148,7 +148,7 @@ public:
         return pNode;
     }
 
-    
+
     /// \brief Create a child using a templated StoreType.
     ///
     /// To create a child StoreType you can use this method like:
@@ -186,7 +186,7 @@ public:
 
     /// \brief An event called when the cache is cleared.
     ofEvent<void> onClear;
-    
+
 protected:
     bool onChildAdd(const std::pair<KeyType, std::shared_ptr<ValueType>>& evt)
     {

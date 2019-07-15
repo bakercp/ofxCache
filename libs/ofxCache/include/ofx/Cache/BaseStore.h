@@ -1,7 +1,7 @@
 //
 // Copyright (c) 2010 Christopher Baker <https://christopherbaker.net>
 //
-// SPDX-License-Identifier:	MIT
+// SPDX-License-Identifier: MIT
 //
 
 
@@ -142,7 +142,7 @@ public:
 
 protected:
     virtual void doAdd(const KeyType& key, std::shared_ptr<ValueType> entry) = 0;
-    
+
     virtual void doUpdate(const KeyType& key, std::shared_ptr<ValueType> entry)
     {
         doAdd(key, entry);
