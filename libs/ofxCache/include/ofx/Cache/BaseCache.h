@@ -221,31 +221,31 @@ protected:
     virtual std::size_t doSize() = 0;
     virtual void doClear() = 0;
 
-    virtual bool doOnChildAdd(const std::pair<KeyType, std::shared_ptr<ValueType>>& evt)
+    virtual bool doOnChildAdd(const std::pair<KeyType, std::shared_ptr<ValueType>>&)
     {
         ofLogVerbose("BaseCache::doOnChildAdd") << "Not implmented.";
         return false;
     }
 
-    virtual bool doOnChildUpdate(const std::pair<KeyType, std::shared_ptr<ValueType>>& evt)
+    virtual bool doOnChildUpdate(const std::pair<KeyType, std::shared_ptr<ValueType>>&)
     {
         ofLogVerbose("BaseCache::doOnChildUpdate") << "Not implmented.";
         return false;
     }
 
-    virtual bool doOnChildRemove(const KeyType& evt)
+    virtual bool doOnChildRemove(const KeyType&)
     {
         ofLogVerbose("BaseCache::doOnChildRemove") << "Not implmented.";
         return false;
     }
 
-    virtual bool doOnChildHas(const KeyType& evt)
+    virtual bool doOnChildHas(const KeyType&)
     {
         ofLogVerbose("BaseCache::doOnChidoOnChildHasldAdd") << "Not implmented.";
         return false;
     }
 
-    virtual bool doOnChildGet(const KeyType& evt)
+    virtual bool doOnChildGet(const KeyType&)
     {
         ofLogVerbose("BaseCache::doOnChildGet") << "Not implmented.";
         return false;

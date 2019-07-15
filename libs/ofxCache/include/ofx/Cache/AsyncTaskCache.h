@@ -115,27 +115,27 @@ public:
     virtual ~AsyncTaskCache();
 
 protected:
-    virtual bool doHas(const KeyType& key) const override
+    virtual bool doHas(const KeyType&) const override
     {
         ofLogError("AsyncTaskCache::doHas()") << "Not implemented.";
     }
 
-    virtual std::shared_ptr<ValueType> doGet(const KeyType& key) override
+    virtual std::shared_ptr<ValueType> doGet(const KeyType&) override
     {
         ofLogError("AsyncTaskCache::doGet()") << "Not implemented.";
     }
 
-    virtual void doAdd(const KeyType& key, std::shared_ptr<ValueType> entry) override
+    virtual void doAdd(const KeyType&, std::shared_ptr<ValueType>) override
     {
         ofLogError("AsyncTaskCache::doAdd()") << "Not implemented.";
     }
 
-    virtual void doUpdate(const KeyType& key, std::shared_ptr<ValueType> entry) override
+    virtual void doUpdate(const KeyType&, std::shared_ptr<ValueType>) override
     {
         ofLogError("AsyncTaskCache::doUpdate()") << "Not implemented.";
     }
 
-    virtual void doRemove(const KeyType& key) override
+    virtual void doRemove(const KeyType&) override
     {
         ofLogError("AsyncTaskCache::doRemove()") << "Not implemented.";
     }
@@ -200,7 +200,7 @@ void AsyncTaskCache<KeyType, ValueType>::doRequest(const KeyType& key)
         _taskQueue.start(taskId, new CacheRequestTask<KeyType, ValueType>(key, *this));
         _requests[taskId] = key;;
     }
-    catch (const Poco::ExistsException& exc)
+    catch (const Poco::ExistsException&)
     {
         // Do nothing.
     }
@@ -228,7 +228,7 @@ void AsyncTaskCache<KeyType, ValueType>::doCancelQueuedRequest(const KeyType& ke
     {
         _taskQueue.cancelQueued(this->toTaskId(key));
     }
-    catch (const Poco::ExistsException& exc)
+    catch (const Poco::ExistsException&)
     {
         // Do nothing.
     }
@@ -242,7 +242,7 @@ float AsyncTaskCache<KeyType, ValueType>::doRequestProgress(const KeyType& key) 
     {
         return _taskQueue.getTaskProgress(this->toTaskId(key));
     }
-    catch (const Poco::ExistsException& exc)
+    catch (const Poco::ExistsException&)
     {
         return 0;
     }
@@ -268,11 +268,9 @@ RequestState AsyncTaskCache<KeyType, ValueType>::doRequestState(const KeyType& k
                 return RequestState::CANCELLING;
             case Poco::Task::TASK_FINISHED:
                 return RequestState::FINISHED;
-            default:
-                return RequestState::UNKNOWN;
         }
     }
-    catch (const Poco::ExistsException& exc)
+    catch (const Poco::ExistsException&)
     {
         return RequestState::UNKNOWN;
     }
